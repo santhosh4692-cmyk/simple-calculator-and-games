@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocket Calc and Star Catcher</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow device-like column; a two-tab switch between the calculator and the game */
+:root {
+  --bg: #EEF3F0; --surface: #FFFFFF; --fg: #17222B; --muted: #5B6B72;
+  --line: #D5DFDA; --accent: #1F8A70; --accent-ink: #FFFFFF; --amber: #D98E1F; --danger: #C2412D;
+  --key: #F5F8F6; --key-op: #DCEFE7;
+  --display: "Chakra Petch", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0F1720; --surface: #17222C; --fg: #E6EEEA; --muted: #95A6A0;
+  --line: #2A3A44; --accent: #4FD1A5; --accent-ink: #0B1A14; --amber: #F2B653; --danger: #F07A63;
+  --key: #1E2B36; --key-op: #1D3A33; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0F1720; --surface: #17222C; --fg: #E6EEEA; --muted: #95A6A0;
+  --line: #2A3A44; --accent: #4FD1A5; --accent-ink: #0B1A14; --amber: #F2B653; --danger: #F07A63;
+  --key: #1E2B36; --key-op: #1D3A33; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 40px; }
+.wrap { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 5px; }
+.tabs a { text-align: center; padding: 10px; border-radius: 10px; color: var(--fg); text-decoration: none; font-family: var(--display); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: .85rem; }
+.tabs a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Calculator */
+.screen { background: var(--bg); border-radius: 12px; padding: 14px 16px; text-align: right; min-height: 92px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; }
+#expr { font-family: var(--mono); color: var(--muted); font-size: .95rem; min-height: 1.3em; overflow-wrap: anywhere; }
+#result { font-family: var(--mono); font-size: 2.2rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#result.err { color: var(--danger); font-size: 1.2rem; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.keys button { font-family: var(--mono); font-size: 1.25rem; padding: 16px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--key); color: var(--fg); cursor: pointer; touch-action: manipulation; }
+.keys button:active { transform: translateY(1px); }
+.keys .op { background: var(--key-op); color: var(--accent); font-weight: 700; }
+.keys .fn { color: var(--amber); }
+.keys .eq { background: var(--accent); color: var(--accent-ink); border-color: transparent; grid-column: span 2; }
+.hint { color: var(--muted); font-size: .85rem; margin: 0; }
+
+/* Game */
+.hud { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 700; letter-spacing: .03em; font-variant-numeric: tabular-nums; }
+.hud .lives { color: var(--danger); }
+.stage { position: relative; width: 100%; aspect-ratio: 3 / 4; max-width: 100%; border-radius: 14px; overflow: hidden; background: var(--bg); touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 20px; background: color-mix(in srgb, var(--surface) 82%, transparent); }
+.overlay h2 { font-family: var(--display); margin: 0; font-size: 1.5rem; }
+.overlay p { margin: 0; color: var(--muted); max-width: 30ch; }
+.btn { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 12px 26px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); cursor: pointer; font-size: 1rem; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pocket Calc &amp; Star Catcher</h1>
+    <p>A simple calculator and a 2D touch game. Works on phone and desktop.</p>
+  </header>
+
+  <nav class="tabs" aria-label="Sections">
+    <a href="#calculator" id="tab-calculator">Calculator</a>
+    <a href="#game" id="tab-game">Game</a>
+  </nav>
+
+  <section class="panel" id="view-calculator" aria-label="Calculator">
+    <div class="screen" aria-live="polite">
+      <div id="expr">12 × 7 + 6</div>
+      <div id="result">90</div>
+    </div>
+    <div class="keys" id="keys">
+      <button class="fn" data-k="C">C</button>
+      <button class="fn" data-k="back" aria-label="Delete">⌫</button>
+      <button class="op" data-k="%">%</button>
+      <button class="op" data-k="/">÷</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="op" data-k="*">×</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button class="op" data-k="-">−</button>
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button class="op" data-k="+">+</button>
+      <button data-k="0">0</button><button data-k=".">.</button>
+      <button class="eq" data-k="=">=</button>
+    </div>
+    <p class="hint">Keyboard works too: digits, + − * /, Enter for =, Backspace to delete, Esc to clear.</p>
+  </section>
+
+  <section class="panel" id="view-game" aria-label="Star Catcher game" hidden>
+    <div class="hud">
+      <span>Score <span id="score">0</span></span>
+      <span>Best <span id="best">0</span></span>
+      <span class="lives" id="lives" aria-label="Lives">♥♥♥</span>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="ov-title">Star Catcher</h2>
+        <p id="ov-text">Drag or slide your finger to move the basket. Catch the stars, dodge the rocks. You have 3 lives.</p>
+        <button class="btn" id="play">Play</button>
+      </div>
+    </div>
+    <p class="hint">On desktop, use the mouse or the ← → arrow keys.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  /* ---------- Tabs ---------- */
+  const views = ["calculator", "game"];
+  function route() {
+    const v = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : "calculator";
+    views.forEach(n => {
+      document.getElementById("view-" + n).hidden = n !== v;
+      const t = document.getElementById("tab-" + n);
+      if (n === v) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+    });
+    if (v !== "game") pauseGame();
+    else resize();
+  }
+  window.addEventListener("hashchange", route);
+
+  /* ---------- Calculator ---------- */
+  const exprEl = document.getElementById("expr"), resEl = document.getElementById("result");
+  let expr = "", justEvaluated = false;
+  const show = { "*": "×", "/": "÷", "-": "−" };
+  const pretty = s => s.replace(/[*/-]/g, c => " " + show[c] + " ").replace(/\+/g, " + ").replace(/\s+/g, " ").trim();
+
+  // Safe evaluator: numbers, + - * / %, unary minus. No eval().
+  function evaluate(s) {
+    const toks = s.match(/\d*\.?\d+|[+\-*/%]/g);
+    if (!toks || toks.join("") !== s) throw new Error("Check the expression");
+    let i = 0;
+    const peek = () => toks[i], next = () => toks[i++];
+    function num() {
+      let t = next();
+      if (t === "-") return -num();
+      if (t === undefined || isNaN(t)) throw new Error("Incomplete expression");
+      let v = parseFloat(t);
+      if (peek() === "%") { next(); v = v / 100; }
+      return v;
+    }
+    function term() {
+      let v = num();
+      while (peek() === "*" || peek() === "/") {
+        const op = next(), r = num();
+        if (op === "/" && r === 0) throw new Error("Cannot divide by zero");
+        v = op === "*" ? v * r : v / r;
+      }
+      return v;
+    }
+    let v = term();
+    while (peek() === "+" || peek() === "-") { const op = next(), r = term(); v = op === "+" ? v + r : v - r; }
+    if (i < toks.length) throw new Error("Check the expression");
+    return Math.round(v * 1e10) / 1e10;
+  }
+  function render(result, isErr) {
+    exprEl.textContent = pretty(expr);
+    resEl.className = isErr ? "err" : "";
+    if (result !== undefined) resEl.textContent = result;
+    else { try { resEl.textContent = expr ? evaluate(expr) : "0"; } catch { resEl.textContent = expr ? "…" : "0"; } }
+  }
+  function press(k) {
+    if (k === "C") { expr = ""; justEvaluated = false; return render("0"); }
+    if (k === "back") { expr = expr.slice(0, -1); return render(); }
+    if (k === "=") {
+      if (!expr) return;
+      try { const r = evaluate(expr); exprEl.textContent = pretty(expr) + " ="; resEl.className = ""; resEl.textContent = r; expr = String(r); justEvaluated = true; }
+      catch (e) { render(e.message, true); }
+      return;
+    }
+    const isOp = "+-*/%".includes(k);
+    if (justEvaluated && !isOp) expr = "";
+    justEvaluated = false;
+    if (isOp && k !== "-" && (expr === "" || /[+\-*/]$/.test(expr))) { if (expr) expr = expr.slice(0, -1) + k; return render(); }
+    if (k === "." ) { const last = expr.split(/[+\-*/%]/).pop(); if (last.includes(".")) return; if (last === "") expr += "0"; }
+    expr += k; render();
+  }
+  document.getElementById("keys").addEventListener("click", e => { const b = e.target.closest("button"); if (b) press(b.dataset.k); });
+  document.addEventListener("keydown", e => {
+    if (document.getElementById("view-calculator").hidden) return;
+    const m = { Enter: "=", "=": "=", Backspace: "back", Escape: "C", x: "*", X: "*" };
+    const k = m[e.key] || ("0123456789.+-*/%".includes(e.key) ? e.key : null);
+    if (k) { e.preventDefault(); press(k); }
+  });
+
+  /* ---------- Star Catcher game ---------- */
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d"), stage = document.getElementById("stage");
+  const overlay = document.getElementById("overlay"), ovTitle = document.getElementById("ov-title"), ovText = document.getElementById("ov-text");
+  const scoreEl = document.getElementById("score"), bestEl = document.getElementById("best"), livesEl = document.getElementById("lives");
+  let W = 300, H = 400, dpr = 1, running = false, last = 0, raf = 0;
+  let player, items, score, lives, spawnT, speed, keys = {}, best = 0;
+  try { best = parseInt(localStorage.getItem("starcatcher-best") || "0", 10) || 0; } catch {}
+  bestEl.textContent = best;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function resize() {
+    const r = stage.getBoundingClientRect(); if (!r.width) return;
+    dpr = window.devicePixelRatio || 1; W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (player) player.y = H - 34; draw();
+  }
+  window.addEventListener("resize", resize);
+
+  function reset() {
+    player = { x: W / 2, y: H - 34, w: Math.max(64, W * 0.2), target: W / 2 };
+    items = []; score = 0; lives = 3; spawnT = 0; speed = 140;
+    scoreEl.textContent = 0; livesEl.textContent = "♥♥♥";
+  }
+  function spawn() {
+    const rock = Math.random() < Math.min(0.45, 0.22 + score / 200);
+    items.push({ x: 16 + Math.random() * (W - 32), y: -16, r: rock ? 13 : 11, rock, vy: speed * (0.8 + Math.random() * 0.5), spin: Math.random() * 6 });
+  }
+  function step(t) {
+    const dt = Math.min(0.033, (t - last) / 1000 || 0); last = t;
+    if (keys.ArrowLeft) player.target -= 420 * dt;
+    if (keys.ArrowRight) player.target += 420 * dt;
+    player.target = Math.max(player.w / 2, Math.min(W - player.w / 2, player.target));
+    player.x += (player.target - player.x) * Math.min(1, dt * 18);
+    spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = Math.max(0.35, 0.95 - score / 120); }
+    speed += dt * 4;
+    for (const it of items) { it.y += it.vy * dt; it.spin += dt * 3; }
+    for (const it of items) {
+      if (it.dead) continue;
+      const hit = it.y + it.r >= player.y - 8 && it.y - it.r <= player.y + 10 && Math.abs(it.x - player.x) < player.w / 2 + it.r * 0.6;
+      if (hit) {
+        it.dead = true;
+        if (it.rock) { lives--; livesEl.textContent = "♥".repeat(Math.max(0, lives)) || "–"; if (lives <= 0) return gameOver(); }
+        else { score++; scoreEl.textContent = score; }
+      } else if (it.y - it.r > H) it.dead = true;
+    }
+    items = items.filter(i => !i.dead);
+    draw();
+    if (running) raf = requestAnimationFrame(step);
+  }
+  function star(x, y, r, a) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.45 : r, an = a + i * Math.PI / 5; ctx.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); }
+    ctx.closePath(); ctx.fill();
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = css("--line");
+    for (let y = 40; y < H; y += 40) ctx.fillRect(0, y, W, 1);
+    if (!player) return;
+    for (const it of items) {
+      if (it.rock) { ctx.fillStyle = css("--muted"); ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.fillStyle = css("--amber"); star(it.x, it.y, it.r, it.spin); }
+    }
+    ctx.fillStyle = css("--accent");
+    const x = player.x - player.w / 2, y = player.y - 8;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, player.w, 18, 9) : ctx.rect(x, y, player.w, 18); ctx.fill();
+  }
+  function start() {
+    resize(); reset(); overlay.hidden = true; running = true; last = performance.now();
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(step);
+  }
+  function gameOver() {
+    running = false;
+    if (score > best) { best = score; bestEl.textContent = best; try { localStorage.setItem("starcatcher-best", String(best)); } catch {} }
+    ovTitle.textContent = "Game over"; ovText.textContent = "You caught " + score + (score === 1 ? " star." : " stars.") + " Best: " + best + ".";
+    document.getElementById("play").textContent = "Play again"; overlay.hidden = false; draw();
+  }
+  function pauseGame() {
+    if (!running) return;
+    running = false; cancelAnimationFrame(raf);
+    ovTitle.textContent = "Paused"; ovText.textContent = "Score " + score + ". Tap Resume to continue.";
+    const b = document.getElementById("play"); b.textContent = "Resume"; b.dataset.resume = "1"; overlay.hidden = false;
+  }
+  document.getElementById("play").addEventListener("click", e => {
+    if (e.currentTarget.dataset.resume) { delete e.currentTarget.dataset.resume; overlay.hidden = true; running = true; last = performance.now(); raf = requestAnimationFrame(step); }
+    else start();
+  });
+  function pointer(e) { if (!player) return; const r = stage.getBoundingClientRect(); player.target = e.clientX - r.left; }
+  stage.addEventListener("pointerdown", pointer);
+  stage.addEventListener("pointermove", pointer);
+  document.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { keys[e.key] = true; if (running) e.preventDefault(); } });
+  document.addEventListener("keyup", e => { keys[e.key] = false; });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) pauseGame(); });
+
+  route();
+})();
+</script>
+
+</html>
